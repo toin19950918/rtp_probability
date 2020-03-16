@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"github.com/spf13/cast"
+	"log"
 	"math"
 	"math/rand"
+	"os"
 	"sort"
 	"time"
 )
@@ -45,11 +47,65 @@ func main(){
 
 	player_total := 30
 	player_rich := 1
-	player_poor := player_total - player_rich
+
 	bet_rich := 5000
 	bet_poor := 500
 	banker_income := 0
+	rich_income := 0
 
+
+	win_big := 0
+	round := 1000
+	odds := 28
+
+	banker_win := false
+
+
+	file, err := os.Create("myfile.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+
+
+
+
+	for round_iter :=0;round_iter<round;round_iter++ {
+
+		//fmt.Printf("round_numer = %v ",round_iter)
+		setGame(round, odds, player_rich, player_total, bet_rich, bet_poor, &banker_income, &win_big, &rich_income,banker_win)
+		avg_poor_income := -(banker_income+rich_income)/(player_total-player_rich)
+
+		file.WriteString("banker_income "+cast.ToString(banker_income) +" " + "rich_income "+cast.ToString(rich_income)+" "+"avg_poor_income "+cast.ToString(avg_poor_income)+"\n")
+	}
+
+	//fmt.Println(win_big)
+	//fmt.Println(banker_income)
+	//fmt.Println(rich_income)
+	//fmt.Println(avg_poor_income)
+
+
+
+
+
+
+
+	//fmt.Println(probability_distribution)
+
+	/*
+	for _, kv := range bet_map {
+		fmt.Printf("%s, %d\n", kv.Key, kv.Value)
+	}
+	sort.Ints(selected_num_list)
+	fmt.Println(selected_num_list)*/
+
+}
+
+
+func setGame(round,odds,player_rich,player_total,bet_rich,bet_poor int,banker_income,win_big,rich_income *int,banker_win bool){
+
+	player_poor := player_total - player_rich
 	rand.Seed(time.Now().UnixNano())
 
 	bet_matrix := [34][]Player{}
@@ -89,13 +145,13 @@ func main(){
 		return bet_map[i].Value > bet_map[j].Value  // 降序
 		// return ss[i].Value > ss[j].Value  // 升序
 	})
-
+/*
 	for _, kv := range bet_map {
 		fmt.Printf("%s, %d\n", kv.Key, kv.Value)
-	}
+	}*/
 
 	probability_total:= 0
-	probability_arr:= setProbability(&probability_total)
+	probability_arr:= setProbability(banker_win,&probability_total)
 	probability_distribution := make([]string,probability_total)
 
 	count := 0
@@ -106,52 +162,37 @@ func main(){
 		}
 	}
 
-	//fmt.Println(probability_distribution)
-	selected_num_list := []int{}
+	selected_num := cast.ToInt(probability_distribution[rand.Intn(probability_total)])
 
-	win_big := 0
+	fmt.Printf("selected number = %v ",selected_num)
 
-	for round :=0;round<100;round++{
-		selected_num := cast.ToInt(probability_distribution[rand.Intn(probability_total)])
+	*rich_income -= bet_rich
 
-		selected_num_list = append(selected_num_list,selected_num)
-
-		fmt.Printf("round_numer = %v ",round)
-		fmt.Println("selected number = ",selected_num)
-
-		for i:=0;i<34;i++{
-			for j:=0;j<len(bet_matrix[i]);j++{
-				bet_matrix[i][j].income -= bet_matrix[i][j].bet_money
-				banker_income += bet_matrix[i][j].bet_money
-			}
+	for i:=0;i<34;i++{
+		for j:=0;j<len(bet_matrix[i]);j++{
+			bet_matrix[i][j].income -= bet_matrix[i][j].bet_money
+			*banker_income += bet_matrix[i][j].bet_money
 		}
-
-		for i:=0;i<len(bet_matrix[selected_num]);i++{
-			bet_matrix[selected_num][i].income += 28*bet_matrix[selected_num][i].bet_money
-			banker_income -= 28*bet_matrix[selected_num][i].bet_money
-
-			if bet_matrix[selected_num][i].bet_money==bet_rich{
-				win_big += 1
-			}
-
-		}
-
-		fmt.Println(bet_matrix)
-		fmt.Println(banker_income)
-		fmt.Println(win_big)
 	}
 
-	/*
-	for _, kv := range bet_map {
-		fmt.Printf("%s, %d\n", kv.Key, kv.Value)
+	for i:=0;i<len(bet_matrix[selected_num]);i++{
+		bet_matrix[selected_num][i].income += odds*bet_matrix[selected_num][i].bet_money
+		*banker_income -= odds*bet_matrix[selected_num][i].bet_money
+
+		if bet_matrix[selected_num][i].bet_money==bet_rich{
+			*win_big += 1
+			*rich_income += odds*bet_rich
+		}
 	}
-	sort.Ints(selected_num_list)
-	fmt.Println(selected_num_list)*/
+
+	//fmt.Println(bet_matrix)
+	//fmt.Println(banker_income)
+
 
 }
 
 
-
+/*
 func randomNumGenerator()[]int{
 
 	random_num := []int{}
@@ -169,9 +210,9 @@ func randomNumGenerator()[]int{
 	//fmt.Println(random_num)
 	return random_num
 
-}
+}*/
 
-func setProbability(probability_total *int)[]int{
+func setProbability(banker_win bool,probability_total *int)[]int{
 	/*
 	file, err := os.Create("file.txt")
 	if err != nil {
@@ -215,8 +256,14 @@ func setProbability(probability_total *int)[]int{
 		probability_arr = append(probability_arr,int_sum)
 		//file.WriteString(cast.ToString(sum*100.0)+"\n")
 	}
-	sort.Sort(sort.Reverse(sort.IntSlice(probability_arr)))
-	//fmt.Println(total)
+	if banker_win==false{
+		sort.Sort(sort.Reverse(sort.IntSlice(probability_arr)))
+	}else{
+		sort.Sort(sort.IntSlice(probability_arr))
+	}
+
+
+
 	return probability_arr
 
 }
